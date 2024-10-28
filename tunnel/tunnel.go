@@ -328,6 +328,9 @@ func handleTCPConn(connCtx C.ConnContext) {
 	remoteConn, err := proxy.DialContext(ctx, metadata.Pure())
 	if err != nil {
 		if rule == nil {
+			for n, p := range Proxies() {
+				log.Warnln("%s: %s", n, p.Name())
+			}
 			log.Warnln(
 				"[TCP] dial %s %s --> %s error: %s",
 				proxy.Name(),
