@@ -1,9 +1,14 @@
 package tunnel
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"math/rand"
 	"net"
+	"net/http"
 	"net/netip"
 	"runtime"
 	"sync"
@@ -328,9 +333,6 @@ func handleTCPConn(connCtx C.ConnContext) {
 	remoteConn, err := proxy.DialContext(ctx, metadata.Pure())
 	if err != nil {
 		if rule == nil {
-			for n, p := range Proxies() {
-				log.Warnln("%s: %s", n, p.Name())
-			}
 			log.Warnln(
 				"[TCP] dial %s %s --> %s error: %s",
 				proxy.Name(),
@@ -350,6 +352,20 @@ func handleTCPConn(connCtx C.ConnContext) {
 	case metadata.SpecialProxy != "":
 		log.Infoln("[TCP] %s --> %s using %s", metadata.SourceAddress(), metadata.RemoteAddress(), metadata.SpecialProxy)
 	case rule != nil:
+
+		for k, v := range Providers() {
+			if k == "aaa" {
+				i := rand.Intn(len(v.Proxies()))
+				for n, p := range v.Proxies() {
+
+					if i == n {
+						updateProxy(k, p.Name())
+						fmt.Println(k, p.Name())
+					}
+				}
+			}
+		}
+
 		log.Infoln(
 			"[TCP] %s --> %s match %s(%s) using %s",
 			metadata.SourceAddress(),
@@ -371,6 +387,52 @@ func handleTCPConn(connCtx C.ConnContext) {
 	}
 
 	handleSocket(connCtx, remoteConn)
+}
+
+func updateProxy(provider, proxy string) {
+	// 定义要请求的URL
+	url := "http://localhost:9999/proxies/" + provider
+
+	// 创建一个Post对象
+	user := map[string]interface{}{
+		"name": proxy,
+	}
+
+	// 将Post对象转换为JSON格式
+	jsonData, err := json.Marshal(user)
+	if err != nil {
+		fmt.Println("JSON转换失败:", err)
+		return
+	}
+
+	// 创建一个PUT请求
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		fmt.Println("创建请求失败:", err)
+		return
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+
+	// 发送请求
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println("发送请求失败:", err)
+		return
+	}
+	defer resp.Body.Close() // 确保在函数结束时关闭响应体
+
+	// 读取响应体
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("读取响应失败:", err)
+		return
+	}
+
+	// 打印响应体
+	fmt.Println(string(body))
 }
 
 func shouldResolveIP(rule C.Rule, metadata *C.Metadata) bool {
