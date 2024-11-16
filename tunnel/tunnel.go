@@ -6,11 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/netip"
 	"runtime"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -353,14 +354,31 @@ func handleTCPConn(connCtx C.ConnContext) {
 		log.Infoln("[TCP] %s --> %s using %s", metadata.SourceAddress(), metadata.RemoteAddress(), metadata.SpecialProxy)
 	case rule != nil:
 
+		//for k, v := range Providers() {
+		//	if k == "aaa" {
+		//		i := rand.Intn(len(v.Proxies()))
+		//		for n, p := range v.Proxies() {
+		//
+		//			if i == n {
+		//				updateProxy(k, p.Name())
+		//				fmt.Println(k, p.Name())
+		//			}
+		//		}
+		//	}
+		//}
 		for k, v := range Providers() {
-			if k == "aaa" {
-				i := rand.Intn(len(v.Proxies()))
-				for n, p := range v.Proxies() {
-
-					if i == n {
-						updateProxy(k, p.Name())
-						fmt.Println(k, p.Name())
+			if strings.Contains(k, "节点选择") {
+				proxiesWithAlive := v.Proxies()
+				lenProxy := len(proxiesWithAlive)
+				for i := 0; i < lenProxy; i++ {
+					if !proxiesWithAlive[i].Alive() {
+						fmt.Println("Remove: ", proxiesWithAlive[i].Name(), proxiesWithAlive[i].Alive())
+						proxiesWithAlive = slices.Delete(proxiesWithAlive, i, i+1)
+						for _, p := range proxiesWithAlive {
+							fmt.Print(p.Name(), "*** ")
+						}
+						fmt.Println(len(proxiesWithAlive))
+						lenProxy = lenProxy - 1
 					}
 				}
 			}
